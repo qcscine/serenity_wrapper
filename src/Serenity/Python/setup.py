@@ -25,7 +25,6 @@ setuptools.setup(
     author_email="scine@phys.chem.ethz.ch",
     description="A wrapper for Serenity",
     long_description=long_description,
-    long_description_content_type="text/markdown",
     url="https://www.scine.ethz.ch",
     packages=["scine_serenity_wrapper"],
     package_data={"scine_serenity_wrapper": ['*.txt' @serenity_PY_DEPS@]},

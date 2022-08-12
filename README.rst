@@ -83,11 +83,11 @@ A minimal workflow could look like this::
 How to Cite
 -----------
 
-When publishing results obtained with SCINE we kindly ask you to cite the
-appropriate references, e.g. the one for ReaDuct.
-This wrapper does not have its own reference; it should also not be mistaken
-for the actual Serenity code it wraps.
+When publishing results obtained with the SCINE Serenity wrapper, please cite the corresponding
+release as archived on `Zenodo <https://doi.org/10.5281/zenodo.6695038>`_ (DOI
+10.5281/zenodo.6695038; please use the DOI of the respective release).
 
+This wrapper should also not be mistaken for the actual Serenity code it wraps.
 For the latter code and its citations, we refer you to the original
 Serenity repository. There you will find the references of the actual methods
 used. They are listed in the `README.md <https://github.com/qcserenity/serenity/blob/master/README.md>`_.

@@ -36,7 +36,7 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   show_serenity_output.setDefaultValue(false);
   this->_fields.push_back("show_serenity_output", show_serenity_output);
 
-  // Generalized duplicates (higher in hierarchy than the serenity settings)
+  // Generalized duplicates (higher in hierarchy than the Serenity settings)
   IntDescriptor spin_multiplicity("The multiplicity.");
   spin_multiplicity.setDefaultValue(abs(defaults.spin) + 1);
   this->_fields.push_back(SettingsNames::spinMultiplicity, spin_multiplicity);
@@ -45,7 +45,7 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   molecular_charge.setDefaultValue(defaults.charge);
   this->_fields.push_back("molecular_charge", molecular_charge);
 
-  IntDescriptor scf_max_iterations("The maximum number of scf iterations.");
+  IntDescriptor scf_max_iterations("The maximum number of SCF iterations.");
   scf_max_iterations.setDefaultValue(defaults.scf.maxCycles);
   this->_fields.push_back(SettingsNames::maxScfIterations, scf_max_iterations);
 
@@ -93,11 +93,11 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   basis_auxJLabel.setDefaultValue(defaults.basis.auxJLabel);
   this->_fields.push_back("basis_auxJLabel", basis_auxJLabel);
 
-  StringDescriptor basis_auxCLabel("Basis set label for the auxiliary basis for corrlation treatments.");
+  StringDescriptor basis_auxCLabel("Basis set label for the auxiliary basis for correlation treatments.");
   basis_auxCLabel.setDefaultValue(defaults.basis.auxCLabel);
   this->_fields.push_back("basis_auxCLabel", basis_auxCLabel);
 
-  BoolDescriptor basis_makeSphericalBasis("Switch: use a spherical basis (or a cartesion one).");
+  BoolDescriptor basis_makeSphericalBasis("Switch: use a spherical basis (or a cartesian one).");
   basis_makeSphericalBasis.setDefaultValue(defaults.basis.makeSphericalBasis);
   this->_fields.push_back("basis_makeSphericalBasis", basis_makeSphericalBasis);
 
@@ -105,11 +105,11 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   basis_integralThreshold.setDefaultValue(defaults.basis.integralThreshold);
   this->_fields.push_back("basis_integralThreshold", basis_integralThreshold);
 
-  StringDescriptor basis_basisLibPath("The path to the basis sets files.");
+  StringDescriptor basis_basisLibPath("The path to the basis set files.");
   basis_basisLibPath.setDefaultValue(defaults.basis.basisLibPath);
   this->_fields.push_back("basis_basisLibPath", basis_basisLibPath);
 
-  IntDescriptor basis_firstECP("The nuclear charge number of the first atom in the PSE to recieve ECPs.");
+  IntDescriptor basis_firstECP("The nuclear charge number of the first atom in the PSE to receive ECPs.");
   basis_firstECP.setDefaultValue(defaults.basis.firstECP);
   this->_fields.push_back("basis_firstECP", basis_firstECP);
 
