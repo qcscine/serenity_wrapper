@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Release 2.0.0
+-------------
+
+- Update calculator interface
+- Allow to specify the pressure for thermochemical calculations
+
 Release 1.0.1
 -------------
 

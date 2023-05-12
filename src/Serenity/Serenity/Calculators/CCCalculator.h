@@ -30,7 +30,7 @@ namespace Serenity {
 /**
  * @brief An implementation of the Scine::Core::Calculator for single system CC calculations.
  */
-class CCCalculator : public Scine::Utils::CloneInterface<CCCalculator, CalculatorBase> {
+class CCCalculator : public Scine::Utils::CloneInterface<CCCalculator, CalculatorBase, Scine::Core::Calculator> {
  public:
   static constexpr const char* model = "CC";
   static constexpr const char* program = "Serenity";

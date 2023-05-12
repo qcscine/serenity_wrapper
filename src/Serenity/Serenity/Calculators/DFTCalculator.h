@@ -30,7 +30,7 @@ namespace Serenity {
 /**
  * @brief An implementation of the Scine::Core::Calculator for single system DFT calculations.
  */
-class DFTCalculator : public Scine::Utils::CloneInterface<DFTCalculator, CalculatorBase> {
+class DFTCalculator : public Scine::Utils::CloneInterface<DFTCalculator, CalculatorBase, Scine::Core::Calculator> {
  public:
   static constexpr const char* model = "DFT";
   static constexpr const char* program = "Serenity";

@@ -30,7 +30,7 @@ namespace Serenity {
 /**
  * @brief An implementation of the Scine::Core::Calculator for single system HF calculations.
  */
-class HFCalculator : public Scine::Utils::CloneInterface<HFCalculator, CalculatorBase> {
+class HFCalculator : public Scine::Utils::CloneInterface<HFCalculator, CalculatorBase, Scine::Core::Calculator> {
  public:
   static constexpr const char* model = "HF";
   static constexpr const char* program = "Serenity";

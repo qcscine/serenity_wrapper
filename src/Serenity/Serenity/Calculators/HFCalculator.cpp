@@ -131,6 +131,7 @@ void HFCalculator::calculateImpl() {
       _requiredProperties.containsSubSet(Scine::Utils::Property::Thermochemistry)) {
     completer.addOneWantedProperty(Scine::Utils::Property::Thermochemistry);
     completer.setTemperature(_settings->getDouble(Scine::Utils::SettingsNames::temperature));
+    completer.setPressure(_settings->getDouble(Scine::Utils::SettingsNames::pressure));
   }
   completer.generateProperties(*_results, *atomCollection);
 }

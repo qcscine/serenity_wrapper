@@ -73,6 +73,11 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   temperature.setMinimum(0.0);
   this->_fields.push_back(SettingsNames::temperature, temperature);
 
+  DoubleDescriptor pressure("The Pressure.");
+  pressure.setDefaultValue(101325.0);
+  pressure.setMinimum(1e-6);
+  this->_fields.push_back(SettingsNames::pressure, pressure);
+
   DoubleDescriptor electronic_temperature("The electronic temperature.");
   electronic_temperature.setDefaultValue(0.0);
   electronic_temperature.setMinimum(0.0);
