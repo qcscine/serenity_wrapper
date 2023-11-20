@@ -1,9 +1,19 @@
 __copyright__ = """This code is licensed under the 3-clause BSD license.
-Copyright ETH Zurich, Laboratory of Physical Chemistry, Reiher Group.
+Copyright ETH Zurich, Department of Chemistry and Applied Biosciences, Reiher Group.
 See LICENSE.txt for details.
 """
 
+import os
 import setuptools
+
+def package_files(directory):
+    paths = []
+    os.chdir('scine_serenity_wrapper')
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join(path, filename))
+    os.chdir('..')
+    return paths
 
 # Read README.rst for the long description
 with open("README.rst", "r") as fh:
@@ -21,7 +31,7 @@ class EmptyListWithLength(list):
 setuptools.setup(
     name="scine_serenity_wrapper",
     version="@Serenity_VERSION@",
-    author="ETH Zurich, Laboratory for Physical Chemistry, Reiher Group",
+    author="ETH Zurich, Department of Chemistry and Applied Biosciences, Reiher Group",
     author_email="scine@phys.chem.ethz.ch",
     description="A wrapper for Serenity",
     long_description=long_description,

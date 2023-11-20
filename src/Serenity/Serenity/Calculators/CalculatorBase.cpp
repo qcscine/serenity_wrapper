@@ -1,7 +1,7 @@
 /**
  * @file
  * @copyright This code is licensed under the 3-clause BSD license.\n
- *            Copyright ETH Zurich, Laboratory of Physical Chemistry, Reiher Group.\n
+ *            Copyright ETH Zurich, Department of Chemistry and Applied Biosciences, Reiher Group.\n
  *            See LICENSE.txt for details.
  */
 /* Wrapper Includes */
@@ -206,7 +206,8 @@ void CalculatorBase::loadState(std::shared_ptr<Scine::Core::State> state) {
     auto orig = castState->system->getElectronicStructure<RESTRICTED>()->getMolecularOrbitals()->getCoefficients();
     (Eigen::MatrixXd) coeff = (Eigen::MatrixXd)orig;
     auto eval = castState->system->getElectronicStructure<RESTRICTED>()->getMolecularOrbitals()->getEigenvalues();
-    auto orbitals = std::make_shared<OrbitalController<RESTRICTED>>(_system->getBasisController());
+    auto nCoreOrbs = castState->system->getElectronicStructure<RESTRICTED>()->getMolecularOrbitals()->getNCoreOrbitals();
+    auto orbitals = std::make_shared<OrbitalController<RESTRICTED>>(_system->getBasisController(), nCoreOrbs);
     orbitals->updateOrbitals(coeff, eval);
     auto es = std::make_shared<ElectronicStructure<RESTRICTED>>(orbitals, _system->getOneElectronIntegralController(),
                                                                 castState->system->getNOccupiedOrbitals<RESTRICTED>());
@@ -218,7 +219,8 @@ void CalculatorBase::loadState(std::shared_ptr<Scine::Core::State> state) {
     coeff.alpha = orig.alpha;
     coeff.beta = orig.beta;
     auto eval = castState->system->getElectronicStructure<UNRESTRICTED>()->getMolecularOrbitals()->getEigenvalues();
-    auto orbitals = std::make_shared<OrbitalController<UNRESTRICTED>>(_system->getBasisController());
+    auto nCoreOrbs = castState->system->getElectronicStructure<UNRESTRICTED>()->getMolecularOrbitals()->getNCoreOrbitals();
+    auto orbitals = std::make_shared<OrbitalController<UNRESTRICTED>>(_system->getBasisController(), nCoreOrbs);
     orbitals->updateOrbitals(coeff, eval);
     auto es = std::make_shared<ElectronicStructure<UNRESTRICTED>>(orbitals, _system->getOneElectronIntegralController(),
                                                                   castState->system->getNOccupiedOrbitals<UNRESTRICTED>());
@@ -251,7 +253,8 @@ std::shared_ptr<Scine::Core::State> CalculatorBase::getState() const {
       (Eigen::MatrixXd) coeff =
           (Eigen::MatrixXd)_system->getElectronicStructure<RESTRICTED>()->getMolecularOrbitals()->getCoefficients();
       auto eval = _system->getElectronicStructure<RESTRICTED>()->getMolecularOrbitals()->getEigenvalues();
-      auto orbitals = std::make_shared<OrbitalController<RESTRICTED>>(system->getBasisController());
+      auto nCoreOrbs = _system->getElectronicStructure<RESTRICTED>()->getMolecularOrbitals()->getNCoreOrbitals();
+      auto orbitals = std::make_shared<OrbitalController<RESTRICTED>>(system->getBasisController(), nCoreOrbs);
       orbitals->updateOrbitals(coeff, eval);
       auto es = std::make_shared<ElectronicStructure<RESTRICTED>>(orbitals, system->getOneElectronIntegralController(),
                                                                   _system->getNOccupiedOrbitals<RESTRICTED>());
@@ -263,7 +266,8 @@ std::shared_ptr<Scine::Core::State> CalculatorBase::getState() const {
       coeff.alpha = orig.alpha;
       coeff.beta = orig.beta;
       auto eval = _system->getElectronicStructure<UNRESTRICTED>()->getMolecularOrbitals()->getEigenvalues();
-      auto orbitals = std::make_shared<OrbitalController<UNRESTRICTED>>(system->getBasisController());
+      auto nCoreOrbs = _system->getElectronicStructure<UNRESTRICTED>()->getMolecularOrbitals()->getNCoreOrbitals();
+      auto orbitals = std::make_shared<OrbitalController<UNRESTRICTED>>(system->getBasisController(), nCoreOrbs);
       orbitals->updateOrbitals(coeff, eval);
       auto es = std::make_shared<ElectronicStructure<UNRESTRICTED>>(orbitals, system->getOneElectronIntegralController(),
                                                                     _system->getNOccupiedOrbitals<UNRESTRICTED>());
@@ -310,10 +314,6 @@ const Scine::Utils::Results& CalculatorBase::calculate(std::string /*description
     // Generate a unique name
     Scine::Utils::UniqueIdentifier uid;
     settings.name = uid.getStringRepresentation();
-    std::cout << std::endl;
-    std::cout << "    Generated new Serenity system with UID:" << std::endl;
-    std::cout << "        " << settings.name << std::endl;
-    std::cout << std::endl;
     // Generate the system
     _system = std::make_shared<SystemController>(_geometry, settings);
   }

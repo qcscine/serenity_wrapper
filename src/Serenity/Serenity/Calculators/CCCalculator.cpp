@@ -1,7 +1,7 @@
 /**
  * @file
  * @copyright This code is licensed under the 3-clause BSD license.\n
- *            Copyright ETH Zurich, Laboratory of Physical Chemistry, Reiher Group.\n
+ *            Copyright ETH Zurich, Department of Chemistry and Applied Biosciences, Reiher Group.\n
  *            See LICENSE.txt for details.
  */
 #include "Serenity/Calculators/CCCalculator.h"
@@ -51,7 +51,9 @@ void CCCalculator::calculateImpl() {
   if (ScfMode == Sty::Options::SCF_MODES::UNRESTRICTED)
     throw std::runtime_error("Unrestricted Coupled Cluster calculations are not yet supported in Serenity.");
   // Calculate energy and electronic structure
-  Sty::Options::CC_LEVEL level;
+  Sty::Options::CC_LEVEL level = Sty::Options::CC_LEVEL::DLPNO_CCSD_T0;
+  auto method = this->_settings->getString("method");
+  Sty::Options::resolve(method, level);
   if (this->_moved) {
     Sty::ScfTask<ScfMode> scf(_system);
     scf.run();
@@ -61,8 +63,6 @@ void CCCalculator::calculateImpl() {
       loc.run();
     }
     Sty::CoupledClusterTask cc(_system);
-    auto method = this->_settings->getString("method");
-    Sty::Options::resolve(method, level);
     cc.settings.level = level;
     cc.run();
     this->_moved = false;

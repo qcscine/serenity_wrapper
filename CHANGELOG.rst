@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Release 3.0.0
+-------------
+
+- Update Serenity to version 1.5.2
+- Add basic unittests based on the Python3 package
+- Update address in license
+
 Release 2.0.0
 -------------
 

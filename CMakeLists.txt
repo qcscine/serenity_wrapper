@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 
 # Setup the Scine Project
 project(Serenity
-  VERSION 2.0.0
+  VERSION 3.0.0
   DESCRIPTION "SCINE Serenity Wrapper."
 )
 
@@ -16,7 +16,7 @@ if(NOT TARGET serenity)
   download_project(
     PROJ serenity
     GIT_REPOSITORY https://github.com/qcserenity/serenity.git
-    GIT_TAG 1.4.0
+    GIT_TAG d1ce63603a492e5a6cafdef81cf2cdd0828d64ef
     QUIET
     UPDATE_DISCONNECTED 1
   )

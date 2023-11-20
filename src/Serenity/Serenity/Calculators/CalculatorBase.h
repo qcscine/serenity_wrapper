@@ -1,7 +1,7 @@
 /**
  * @file
  * @copyright This code is licensed under the 3-clause BSD license.\n
- *            Copyright ETH Zurich, Laboratory of Physical Chemistry, Reiher Group.\n
+ *            Copyright ETH Zurich, Department of Chemistry and Applied Biosciences, Reiher Group.\n
  *            See LICENSE.txt for details.
  */
 #ifndef SERENITY_CALCULATORBASE_H_
@@ -81,12 +81,12 @@ class CalculatorBase : public Scine::Utils::CloneInterface<Scine::Utils::Abstrac
    * @brief Getter for the name of the underlying method.
    * @returns Returns the name of the underlying method.
    */
-  virtual std::string name() const = 0;
+  virtual std::string name() const override = 0;
   /**
    * @brief Returns a list of all properties this Calculator can produce.
    * @return Scine::Utils::PropertyList A list of all properties this Calculator can produce.
    */
-  virtual Scine::Utils::PropertyList possibleProperties() const = 0;
+  virtual Scine::Utils::PropertyList possibleProperties() const override = 0;
   /**
    * @brief The main function running calculations.
    * @param dummy   A dummy parameter.
@@ -123,6 +123,13 @@ class CalculatorBase : public Scine::Utils::CloneInterface<Scine::Utils::Abstrac
    * @return std::shared_ptr<Scine::Core::State> The current state/system.
    */
   std::shared_ptr<Scine::Core::State> getState() const final;
+  /**
+   * @brief Whether the calculator has no underlying Python code and can therefore
+   * release the global interpreter lock in Python bindings
+   */
+  bool allowsPythonGILRelease() const override {
+    return true;
+  };
 
  protected:
   std::unique_ptr<ScineSettings> _settings;

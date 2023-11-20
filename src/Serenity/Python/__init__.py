@@ -1,12 +1,12 @@
 __copyright__ = """This code is licensed under the 3-clause BSD license.
-Copyright ETH Zurich, Laboratory of Physical Chemistry, Reiher Group.
+Copyright ETH Zurich, Department of Chemistry and Applied Biosciences, Reiher Group.
 See LICENSE.txt for details.
 """
 
 import os
 import scine_utilities as utils
 
-manager = utils.core.ModuleManager()
+manager = utils.core.ModuleManager.get_instance()
 current_path = os.path.dirname(os.path.realpath(__file__))
 lib_path = os.path.dirname(os.path.dirname(os.path.dirname(current_path)))
 os.environ['SERENITY_RESOURCES'] = os.path.join(current_path, 'data/')

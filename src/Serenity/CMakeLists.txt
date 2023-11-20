@@ -98,7 +98,7 @@ if(SCINE_BUILD_PYTHON_BINDINGS)
   # Figure out python dependencies
   include(TargetLibName)
   set(_module_name "serenity.module${CMAKE_SHARED_LIBRARY_SUFFIX}")
-  set(serenity_PY_DEPS ", \"${_module_name}\", \"data\"")
+  set(serenity_PY_DEPS ", \"${_module_name}\", *package_files(\"data\")")
   unset(_module_name)
   target_lib_type(Scine::UtilsOS _utils_libtype)
   if(_utils_libtype STREQUAL "SHARED_LIBRARY")

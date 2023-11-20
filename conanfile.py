@@ -3,7 +3,7 @@ import sys
 
 class ScineSerenityConan(ScineConan):
     name = "scine_serenity_wrapper"
-    version = "2.0.0"
+    version = "3.0.0"
     url = "https://github.com/qcscine/serenity_wrapper"
     description = """A wrapper around Serenity (https://github.com/qcserenity/serenity),
 it exports DFT, HF and other quantum chemistry capabilities into the SCINE tool
@@ -29,5 +29,5 @@ chain."""
         "dev/cmake/*", "src/*", "CMakeLists.txt", "README.rst", "LICENSE.txt",
         "dev/conan/hook.cmake", "dev/conan/glue/*"
     ]
-    requires = ["scine_utilities/8.0.0", "serenity/1.4.0"]
+    requires = ["scine_utilities/9.0.0", "serenity/1.5.2"]
     cmake_name = "Serenity"

@@ -68,7 +68,7 @@ A minimal workflow could look like this::
     structure.positions = [[-0.7, 0, 0], [0.7, 0, 0]]
     
     # Get calculator
-    manager = su.core.ModuleManager()
+    manager = su.core.ModuleManager.get_instance()
     calculator = manager.get('calculator', 'DFT')
     
     # Configure calculator
