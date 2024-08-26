@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Release 3.1.0
+-------------
+
+- Add unit tests for Python package and remove obsolete tests
+
 Release 3.0.0
 -------------
 

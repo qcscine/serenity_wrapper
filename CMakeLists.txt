@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 
 # Setup the Scine Project
 project(Serenity
-  VERSION 3.0.0
+  VERSION 3.1.0
   DESCRIPTION "SCINE Serenity Wrapper."
 )
 

@@ -16,7 +16,7 @@ def package_files(directory):
     return paths
 
 # Read README.rst for the long description
-with open("README.rst", "r") as fh:
+with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 
@@ -37,7 +37,8 @@ setuptools.setup(
     long_description=long_description,
     url="https://www.scine.ethz.ch",
     packages=["scine_serenity_wrapper"],
-    package_data={"scine_serenity_wrapper": ['*.txt' @serenity_PY_DEPS@]},
+    include_package_data=True,
+    package_data={"scine_serenity_wrapper": ['*.txt' @serenity_PY_DEPS@, "Tests/*"]},
     install_requires=["scine_utilities"],
     classifiers=[
         "Programming Language :: Python",

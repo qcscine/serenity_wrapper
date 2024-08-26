@@ -87,6 +87,13 @@ When publishing results obtained with the SCINE Serenity wrapper, please cite th
 release as archived on `Zenodo <https://doi.org/10.5281/zenodo.6695038>`_ (DOI
 10.5281/zenodo.6695038; please use the DOI of the respective release).
 
+Furthermore, when publishing results obtained with any SCINE module, please cite the following paper:
+
+T. Weymuth, J. P. Unsleber, P. L. Türtscher, M. Steiner, J.-G. Sobez, C. H. Müller, M. Mörchen,
+V. Klasovita, S. A. Grimmel, M. Eckhoff, K.-S. Csizi, F. Bosia, M. Bensberg, M. Reiher,
+"SCINE—Software for chemical interaction networks", *J. Chem. Phys.*, **2024**, *160*, 222501
+(DOI `10.1063/5.0206974 <https://doi.org/10.1063/5.0206974>`_).
+
 This wrapper should also not be mistaken for the actual Serenity code it wraps.
 For the latter code and its citations, we refer you to the original
 Serenity repository. There you will find the references of the actual methods

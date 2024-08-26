@@ -58,7 +58,7 @@ if(SCINE_BUILD_PYTHON_BINDINGS)
 
   add_custom_command(TARGET Serenity POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Serenity> ${CMAKE_CURRENT_BINARY_DIR}/scine_serenity_wrapper
-    COMMENT "Copying 'serenity.module.so' to 'scine_serenity'"
+    COMMENT "Copying 'serenity.module.so' to 'scine_serenity_wrapper'"
   )
 
   install(CODE
@@ -68,10 +68,15 @@ if(SCINE_BUILD_PYTHON_BINDINGS)
      message(FATAL_ERROR \"Fatal error when installing Python module using PIP.\")
    endif()"
   )
-  # Copy the setup file and README.rst into the binary dir so you can install
+  # Copy the setup file into the binary dir so you can install
   # using pip or make a distribution with the compiled binary
   file(
     COPY ${CMAKE_CURRENT_SOURCE_DIR}/Python/__init__.py
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/scine_serenity_wrapper
+  )
+
+  file(
+    COPY ${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/scine_serenity_wrapper
   )
 
