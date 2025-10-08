@@ -1,0 +1,204 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e132dd8..5e132dd 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -6,14 +6,6 @@ project(serenity
+         DESCRIPTION "Serenity: A subsystem quantum chemistry program."
+ 	LANGUAGES CXX)
+ 
+-### Require out-of-source builds
+-file(TO_CMAKE_PATH "${PROJECT_BINARY_DIR}/CMakeLists.txt" LOC_PATH)
+-if(EXISTS "${LOC_PATH}")
+-    message(FATAL_ERROR "You cannot build in a source directory (or any directory with a "
+-                        "CMakeLists.txt file). Please make a build subdirectory. Feel free to "
+-                        "remove CMakeCache.txt and CMakeFiles.")
+-endif()
+-
+ # the cmake folder contains CMake files to locate some modules
+ set(CMAKE_MODULE_PATH  ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+ 
+diff --git a/src/analysis/orbitalLocalization/SPADEAlgorithm.cpp b/src/analysis/orbitalLocalization/SPADEAlgorithm.cpp
+index ce43a19..029ba2f 100644
+--- a/src/analysis/orbitalLocalization/SPADEAlgorithm.cpp
++++ b/src/analysis/orbitalLocalization/SPADEAlgorithm.cpp
+@@ -72,8 +72,8 @@ SpinPolarizedData<SCFMode, Eigen::VectorXi> SPADEAlgorithm<SCFMode>::run() {
+     assignment_spin = Eigen::VectorXi::Constant(nOcc_spin, 1);
+     assignment_spin.head(lastActiveOrbital) = Eigen::VectorXi::Zero(lastActiveOrbital);
+   };
+-  // TODO: Allow the splitting of core and non-core orbitals.
+   orbitalController->updateOrbitals(coefficients, _supersystem->getActiveOrbitalController<SCFMode>()->getEigenvalues());
++  orbitalController->setCoreOrbitalsByNumber(0);
+   return assignment;
+ }
+ 
+diff --git a/src/data/OrbitalController.cpp b/src/data/OrbitalController.cpp
+index e7b9d05..49fb33e 100644
+--- a/src/data/OrbitalController.cpp
++++ b/src/data/OrbitalController.cpp
+@@ -457,7 +457,12 @@ SpinPolarizedData<SCFMode, unsigned int> OrbitalController<SCFMode>::getNCoreOrb
+   const auto& orbitalFlags = this->getOrbitalFlags();
+   SpinPolarizedData<SCFMode, unsigned int> nCoreOrbitals(0);
+   for_spin(orbitalFlags, nCoreOrbitals) {
+-    nCoreOrbitals_spin = orbitalFlags_spin.sum();
++    nCoreOrbitals_spin = 0;
++    for (unsigned int i = 0; i < orbitalFlags_spin.size(); ++i) {
++      if (orbitalFlags_spin[i] == 1) {
++        nCoreOrbitals_spin += 1;
++      }
++    }
+   };
+   return nCoreOrbitals;
+ }
+@@ -765,11 +770,11 @@ OrbitalController<SCFMode>::getValenceOrbitalIndices(SpinPolarizedData<SCFMode,
+   const auto& coreOrbitals = this->getOrbitalFlags();
+   for_spin(nOcc, valenceRange, coreRange, coreOrbitals) {
+     for (unsigned int iOcc = 0; iOcc < nOcc_spin; ++iOcc) {
+-      if (!coreOrbitals_spin[iOcc]) {
+-        valenceRange_spin.push_back(iOcc);
++      if (coreOrbitals_spin[iOcc]) {
++        coreRange_spin.push_back(iOcc);
+       }
+       else {
+-        coreRange_spin.push_back(iOcc);
++        valenceRange_spin.push_back(iOcc);
+       }
+     } // for iOcc
+   };  // for spin
+diff --git a/src/data/OrbitalController.h b/src/data/OrbitalController.h
+index e5f77dc..4e4a585 100644
+--- a/src/data/OrbitalController.h
++++ b/src/data/OrbitalController.h
+@@ -44,11 +44,11 @@ class OrbitalController : public NotifyingClass<OrbitalController<SCFMode>>, pub
+    * @param coefficientMatrix with data defined for the basis.
+    * @param basis             for which the orbitals in coefficientMatrix are defined.
+    * @param eigenvalues       the orbital energies.
+-   * @param isCoreOrbital     Flag for core orbitals.
++   * @param orbitalFlags      Flag for core orbitals.
+    */
+   OrbitalController(std::unique_ptr<CoefficientMatrix<SCFMode>> coefficients, std::shared_ptr<BasisController> basisController,
+                     std::unique_ptr<SpinPolarizedData<SCFMode, Eigen::VectorXd>> eigenvalues,
+-                    std::unique_ptr<SpinPolarizedData<SCFMode, Eigen::VectorXi>> isCoreOrbital);
++                    std::unique_ptr<SpinPolarizedData<SCFMode, Eigen::VectorXi>> orbitalFlags);
+   /**
+    * @param isCoreOrbital     Flag for core orbitals.
+    * @param coefficients      with data defined for the basis.
+@@ -59,8 +59,8 @@ class OrbitalController : public NotifyingClass<OrbitalController<SCFMode>>, pub
+                     std::unique_ptr<CoefficientMatrix<SCFMode>> coefficients, std::shared_ptr<BasisController> basisController,
+                     std::unique_ptr<SpinPolarizedData<SCFMode, Eigen::VectorXd>> eigenvalues);
+   /**
+-   * @param coefficientMatrix with data defined for the basis
+-   * @param basis             for which the orbitals in coefficientMatrix are defined.
++   * @param coefficients      with data defined for the basis
++   * @param basisController   for which the orbitals in coefficientMatrix are defined.
+    * @param eigenvalues       the orbital energies
+    * @param nCoreElectrons    The number of core electrons (Assigns the core orbitals by eigenvalue).
+    */
+@@ -68,11 +68,11 @@ class OrbitalController : public NotifyingClass<OrbitalController<SCFMode>>, pub
+                     const SpinPolarizedData<SCFMode, Eigen::VectorXd>& eigenvalues, unsigned int nCoreElectrons);
+   /**
+    * @brief provides an empty set of orbitals waiting to be filled
+-   * @param basis for which the orbitals in coefficientMatrix are defined.
+-   * @param nCoreOrbitals The number of core orbitals (Assigns the first n/2 orbitals as core).
++   * @param basisController for which the orbitals in coefficientMatrix are defined.
++   * @param nCoreOrbitals The number of core orbitals.
+    */
+   explicit OrbitalController(std::shared_ptr<BasisController> basisController,
+-                             const SpinPolarizedData<SCFMode, unsigned int> nCoreElectrons);
++                             const SpinPolarizedData<SCFMode, unsigned int> nCoreOrbitals);
+   /**
+    * @param orig Explicit copy constructor.
+    *     (Is explicit to avoid unintentional copies.)
+diff --git a/src/geometry/Geometry.cpp b/src/geometry/Geometry.cpp
+index d7c77ed..4e371cc 100644
+--- a/src/geometry/Geometry.cpp
++++ b/src/geometry/Geometry.cpp
+@@ -37,6 +37,15 @@
+ 
+ namespace Serenity {
+ 
++Geometry::~Geometry() {
++  // Remove the geometry from the atom's sensitive objects to ensure that the list remains nice and short.
++  // Furthermore, the `expired()` function of std::weak_ptr appears to have trouble detecting that the underlying
++  // object was destroyed in some cases, leading to a segmentation fault.
++  for (const auto& atom : _atoms) {
++    atom->removeSensitiveObject(this->_self);
++  }
++}
++
+ Geometry::Geometry(std::vector<std::shared_ptr<Atom>> atoms)
+   : _atoms(atoms),
+     _minX(std::numeric_limits<double>::max()),
+diff --git a/src/geometry/Geometry.h b/src/geometry/Geometry.h
+index 25dbb86..d65096e 100644
+--- a/src/geometry/Geometry.h
++++ b/src/geometry/Geometry.h
+@@ -58,7 +58,7 @@ class Geometry : public ObjectSensitiveClass<Atom>, public NotifyingClass<Geomet
+   /**
+    * @brief Destructor.
+    */
+-  virtual ~Geometry() = default;
++  virtual ~Geometry();
+   /**
+    * @returns the atoms forming this Geometry
+    */
+diff --git a/src/misc/SystemSplittingTools.cpp b/src/misc/SystemSplittingTools.cpp
+index 134ec81..b16367d 100644
+--- a/src/misc/SystemSplittingTools.cpp
++++ b/src/misc/SystemSplittingTools.cpp
+@@ -309,8 +309,6 @@ SystemSplittingTools<SCFMode>::splitElectronicStructure(std::shared_ptr<SystemCo
+   // update density matrices
+   actES->getDensityMatrixController()->updateDensityMatrix();
+   envES->getDensityMatrixController()->updateDensityMatrix();
+-  assert(actES->getDensityMatrix().getBasisController() == basisController);
+-  assert(envES->getDensityMatrix().getBasisController() == basisController);
+   return std::pair<std::shared_ptr<ElectronicStructure<SCFMode>>, std::shared_ptr<ElectronicStructure<SCFMode>>>(actES, envES);
+ }
+ 
+diff --git a/src/notification/NotifyingClass.h b/src/notification/NotifyingClass.h
+index 1bca395..fecf48b 100644
+--- a/src/notification/NotifyingClass.h
++++ b/src/notification/NotifyingClass.h
+@@ -90,6 +90,22 @@ class NotifyingClass {
+     _sensitiveObjects.push_back(newSensitiveObject);
+   }
+ 
++  /**
++   * @brief Manually remove an element from the sensitive objects list.
++   * @param newSensitiveObject The pointer to the element to be removed.
++   */
++  void removeSensitiveObject(std::weak_ptr<ObjectSensitiveClass<T>> newSensitiveObject) const {
++    unsigned int index = 0;
++    for (index = 0; index < _sensitiveObjects.size(); index++) {
++      if (!_sensitiveObjects[index].expired() && _sensitiveObjects[index].lock() == newSensitiveObject.lock()) {
++        break;
++      }
++    }
++    if (index < _sensitiveObjects.size()) {
++      _sensitiveObjects.erase(_sensitiveObjects.begin() + index);
++    }
++  }
++
+  protected:
+   /**
+    * @brief Informs all attached objects about changes in this object.
+diff --git a/src/tasks/TopDownStaticEmbeddingTask.cpp b/src/tasks/TopDownStaticEmbeddingTask.cpp
+index bc89c66..775c586 100644
+--- a/src/tasks/TopDownStaticEmbeddingTask.cpp
++++ b/src/tasks/TopDownStaticEmbeddingTask.cpp
+@@ -242,10 +242,12 @@ void TopDownStaticEmbeddingTask<SCFMode>::setUpSubsystems(
+     quasiRestrictedOrbitalsTask.run();
+   }
+   // Localization
+-  LocalizationTask localizationTask(supersystem);
+-  localizationTask.settings = loc;
+-  localizationTask.settings.separateSOMOs = useQuasiRestrictedOrbitals || loc.separateSOMOs;
+-  localizationTask.run();
++  if (split.systemPartitioning != Options::SYSTEM_SPLITTING_ALGORITHM::SPADE) {
++    LocalizationTask localizationTask(supersystem);
++    localizationTask.settings = loc;
++    localizationTask.settings.separateSOMOs = useQuasiRestrictedOrbitals || loc.separateSOMOs;
++    localizationTask.run();
++  }
+ 
+   // Splitting
+   SystemSplittingTask<SCFMode> splittingTask(supersystem, allSystems);

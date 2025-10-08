@@ -34,16 +34,22 @@ namespace Scine {
 namespace Serenity {
 
 std::string CCCalculator::name() const {
-  return "SerenityCCCalculator";
+  return calculatorName;
 }
 
 Scine::Utils::PropertyList CCCalculator::possibleProperties() const {
-  return Scine::Utils::Property::Energy | Scine::Utils::Property::AtomicCharges |
-         Scine::Utils::Property::OverlapMatrix | Scine::Utils::Property::AOtoAtomMapping;
+  return Scine::Utils::Property::Energy | Scine::Utils::Property::AtomicCharges | Scine::Utils::Property::OverlapMatrix |
+         Scine::Utils::Property::AOtoAtomMapping | Scine::Utils::Property::OneElectronMatrix;
 }
 
 void CCCalculator::applyFixedSettings(Sty::Settings& settings) const {
   settings.method = Sty::Options::ELECTRONIC_STRUCTURE_THEORIES::HF;
+}
+
+void CCCalculator::storeGradients(Sty::Options::SCF_MODES ScfMode) {
+  (void)ScfMode;
+  throw std::runtime_error("Gradients of the energy with respect to the nuclear coordinates are not available from "
+                           "Serenity for coupled cluster type methods.");
 }
 
 template<Sty::Options::SCF_MODES ScfMode>
@@ -54,12 +60,13 @@ void CCCalculator::calculateImpl() {
   Sty::Options::CC_LEVEL level = Sty::Options::CC_LEVEL::DLPNO_CCSD_T0;
   auto method = this->_settings->getString("method");
   Sty::Options::resolve(method, level);
-  if (this->_moved) {
+  if (this->_moved && this->propertyRequiresSCF()) {
     Sty::ScfTask<ScfMode> scf(_system);
     scf.run();
     if (level == Sty::Options::CC_LEVEL::DLPNO_CCSD_T0 || level == Sty::Options::CC_LEVEL::CCSD_T) {
       Sty::LocalizationTask loc(_system);
       loc.settings.locType = Sty::Options::ORBITAL_LOCALIZATION_ALGORITHMS::IBO;
+      loc.settings.splitValenceAndCore = true;
       loc.run();
     }
     Sty::CoupledClusterTask cc(_system);
@@ -67,37 +74,17 @@ void CCCalculator::calculateImpl() {
     cc.run();
     this->_moved = false;
     _results->set<Scine::Utils::Property::SuccessfulCalculation>(true);
+    auto es = _system->getElectronicStructure<ScfMode>();
+    const double hf = es->getEnergy(Sty::ENERGY_CONTRIBUTIONS::HF_ENERGY);
+    const double sd = es->getEnergy(Sty::ENERGY_CONTRIBUTIONS::CCSD_CORRECTION);
+    double t = 0.0;
+    if (level == Sty::Options::CC_LEVEL::DLPNO_CCSD_T0 || level == Sty::Options::CC_LEVEL::CCSD_T) {
+      t = es->getEnergy(Sty::ENERGY_CONTRIBUTIONS::TRIPLES_CORRECTION);
+    }
+    const double total = hf + sd + t;
+    _results->set<Scine::Utils::Property::Energy>(total);
   }
-  auto es = _system->getElectronicStructure<ScfMode>();
-  const double hf = es->getEnergy(Sty::ENERGY_CONTRIBUTIONS::HF_ENERGY);
-  const double sd = es->getEnergy(Sty::ENERGY_CONTRIBUTIONS::CCSD_CORRECTION);
-  double t = 0.0;
-  if (level == Sty::Options::CC_LEVEL::DLPNO_CCSD_T0 || level == Sty::Options::CC_LEVEL::CCSD_T) {
-    t = es->getEnergy(Sty::ENERGY_CONTRIBUTIONS::TRIPLES_CORRECTION);
-  }
-  const double total = hf + sd + t;
-  _results->set<Scine::Utils::Property::Energy>(total);
-
-  if (_requiredProperties.containsSubSet(Scine::Utils::Property::AtomicCharges)) {
-    auto charges = getMullikenCharges<ScfMode>();
-    _results->set<Scine::Utils::Property::AtomicCharges>(charges);
-  }
-
-  /*
-   * Autocompletion part of the results
-   */
-  auto atomCollection = this->getStructure();
-  Scine::Utils::ResultsAutoCompleter completer(*atomCollection);
-  // Fill results with some basic data
-  //  - AO to Atom Mapping
-  auto indices = _system->getAtomCenteredBasisController()->getBasisIndices();
-  Scine::Utils::AtomsOrbitalsIndexes counts(indices.size());
-  for (const auto& index : indices) {
-    counts.addAtom(index.second - index.first);
-  }
-  _results->set<Scine::Utils::Property::AOtoAtomMapping>(counts);
-  //  - AO Overlap
-  _results->set<Scine::Utils::Property::OverlapMatrix>(_system->getOneElectronIntegralController()->getOverlapIntegrals());
+  this->storeProperties<ScfMode>();
 }
 
 bool CCCalculator::supportsMethodFamily(const std::string& methodFamily) const {

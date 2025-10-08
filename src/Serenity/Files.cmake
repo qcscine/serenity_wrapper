@@ -11,6 +11,17 @@ set(SERENITY_MODULE_FILES
   "Serenity/Calculators/ScineSettings.cpp"
   "Serenity/Calculators/ScineSettings.h"
   "Serenity/Calculators/SerenityState.h"
+  "Serenity/Calculators/SerenityEmbeddingCalculator.cpp"
+  "Serenity/Calculators/SerenityEmbeddingCalculator.h"
+  "Serenity/Calculators/SerenityEmbeddingCalculatorSettings.cpp"
+  "Serenity/Calculators/SerenityEmbeddingCalculatorSettings.h"
   "Serenity/SerenityModule.cpp"
   "Serenity/SerenityModule.h"
+  "Serenity/Utilities/SerenityConversionFunctions.cpp"
+  "Serenity/Utilities/SerenityConversionFunctions.h"
+)
+
+set(SERENITY_TEST_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/Resources/PathToTestResources.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/Calculators/SerenityEmbeddingCalculatorTest.cpp"
 )

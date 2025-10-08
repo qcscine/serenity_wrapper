@@ -8,9 +8,11 @@
 #include "Serenity/Calculators/CalculatorBase.h"
 #include "Serenity/Calculators/ScineSettings.h"
 #include "Serenity/Calculators/SerenityState.h"
+#include "Serenity/Utilities/SerenityConversionFunctions.h"
 /* Serenity Includes */
 #include <analysis/populationAnalysis/HirshfeldPopulationCalculator.h>
 #include <analysis/populationAnalysis/MullikenPopulationCalculator.h>
+#include <basis/AtomCenteredBasisController.h>
 #include <data/ElectronicStructure.h>
 #include <data/OrbitalController.h>
 #include <data/grid/BasisFunctionOnGridController.h>
@@ -19,10 +21,11 @@
 #include <data/grid/DensityOnGridCalculator.h>
 #include <data/matrices/DensityMatrix.h>
 #include <geometry/Geometry.h>
-#include <grid/GridControllerFactory.h>
+#include <integrals/OneElectronIntegralController.h>
 #include <integrals/wrappers/Libint.h>
 #include <io/FormattedOutputStream.h>
 #include <math/Matrix.h>
+#include <potentials/HCorePotential.h>
 #include <system/SystemController.h>
 /* Scine Includes */
 #include <Utils/Geometry.h>
@@ -105,12 +108,7 @@ Scine::Utils::PropertyList CalculatorBase::getRequiredProperties() const {
 }
 
 void CalculatorBase::setStructure(const Scine::Utils::AtomCollection& structure) {
-  auto scine_elements = structure.getElements();
-  std::vector<std::string> symbols;
-  for (auto& e : scine_elements) {
-    symbols.push_back(Scine::Utils::ElementInfo::symbol(e));
-  }
-  _geometry = std::make_shared<Geometry>(symbols, Eigen::MatrixXd(structure.getPositions()));
+  _geometry = std::make_shared<Geometry>(SerenityConversionFunctions::atomCollectionToGeometry(structure));
   _scinePositions = std::make_unique<Scine::Utils::PositionCollection>(structure.getPositions());
   // TODO
   //  if (_system != nullptr)
@@ -123,15 +121,7 @@ std::unique_ptr<Scine::Utils::AtomCollection> CalculatorBase::getStructure() con
   if (!_geometry || !_scinePositions) {
     throw std::runtime_error("Missing geometry in a Serenity Calculator");
   }
-  std::vector<Scine::Utils::ElementType> scine_elements;
-  for (auto& s : _geometry->getAtomSymbols()) {
-    if (s.size() == 2) {
-      s[1] = tolower(s[1]);
-    }
-    scine_elements.push_back(Scine::Utils::ElementInfo::elementTypeForSymbol(s));
-  };
-  Scine::Utils::PositionCollection scine(*_scinePositions);
-  return std::make_unique<Scine::Utils::AtomCollection>(scine_elements, scine);
+  return std::make_unique<Scine::Utils::AtomCollection>(SerenityConversionFunctions::geometryToAtomCollection(*_geometry));
 }
 
 void CalculatorBase::modifyPositions(Scine::Utils::PositionCollection newPositions) {
@@ -195,10 +185,7 @@ void CalculatorBase::loadState(std::shared_ptr<Scine::Core::State> state) {
 
   _geometry = std::make_shared<Geometry>(castState->system->getGeometry()->getAtomSymbols(),
                                          castState->system->getGeometry()->getCoordinates());
-  //  auto old = iOOptions.printSystemInfoOnCreation;
-  //  iOOptions.printSystemInfoOnCreation = false;
   _system = std::make_shared<SystemController>(_geometry, settings);
-  //  iOOptions.printSystemInfoOnCreation = old;
 
   // Load data into the new system generated from the state
   if (castState->system->hasElectronicStructure<RESTRICTED>()) {
@@ -241,11 +228,8 @@ std::shared_ptr<Scine::Core::State> CalculatorBase::getState() const {
   // Generate a unique name
   Scine::Utils::UniqueIdentifier uid;
   settings.name = uid.getStringRepresentation();
-  //  auto old = iOOptions.printSystemInfoOnCreation;
-  //  iOOptions.printSystemInfoOnCreation = false;
   auto geometry = std::make_shared<Geometry>(_geometry->getAtomSymbols(), _geometry->getCoordinates());
   auto system = std::make_shared<SystemController>(geometry, settings);
-  //  iOOptions.printSystemInfoOnCreation = old;
 
   if (_system) {
     if (_system->hasElectronicStructure<RESTRICTED>()) {
@@ -280,7 +264,7 @@ std::shared_ptr<Scine::Core::State> CalculatorBase::getState() const {
 
 const Scine::Utils::Results& CalculatorBase::calculate(std::string /*description*/) {
   if (!_geometry) {
-    throw std::runtime_error("Missing geometry in Serenity DFT Calculator");
+    throw std::runtime_error("Missing geometry in Serenity Calculator");
   };
 
   if (!this->possibleProperties().containsSubSet(_requiredProperties)) {
@@ -300,23 +284,7 @@ const Scine::Utils::Results& CalculatorBase::calculate(std::string /*description
     iOOptions.gridAccuracyCheck = false;
     iOOptions.timingsPrintLevel = 0;
   }
-
-  // System Initializations
-  if (!_system) {
-    // Parse current settings
-    auto settings = Settings();
-    // throws error for wrong input and updates 'any' entries
-    Utils::Solvation::ImplicitSolvation::solvationNeededAndPossible(availableSolvationModels(), *_settings);
-    // Apply user settings
-    _settings->applyTo(settings);
-    // Apply fixed settings and those that are specific to the Calculator implementation at hand.
-    this->applyFixedSettings(settings);
-    // Generate a unique name
-    Scine::Utils::UniqueIdentifier uid;
-    settings.name = uid.getStringRepresentation();
-    // Generate the system
-    _system = std::make_shared<SystemController>(_geometry, settings);
-  }
+  _system = this->getSystemController();
 
   // Initialize the results
   _results = std::make_unique<Scine::Utils::Results>();
@@ -402,5 +370,217 @@ template std::vector<double> CalculatorBase::getMullikenCharges<Options::SCF_MOD
 template std::vector<double> CalculatorBase::getHirshfeldCharges<Options::SCF_MODES::RESTRICTED>() const;
 template std::vector<double> CalculatorBase::getHirshfeldCharges<Options::SCF_MODES::UNRESTRICTED>() const;
 
+void CalculatorBase::storeCoreHamiltonian() {
+  // reroute output
+  std::ofstream out(_system->getSettings().path + "/hcore.cout.txt");
+  std::streambuf* coutbuf = std::cout.rdbuf();
+  std::cout.rdbuf(out.rdbuf());
+  // calculate
+  try {
+    Sty::HCorePotential<RESTRICTED> hCorePotential(this->_system);
+    const auto& hCoreMatrix = hCorePotential.getMatrix();
+    _results->set<Scine::Utils::Property::OneElectronMatrix>(hCoreMatrix);
+  }
+  catch (Sty::SerenityError& e) {
+    throw Core::UnsuccessfulCalculationException(e.what());
+  }
+  // reset output
+  std::cout.rdbuf(coutbuf);
+}
+
+template<Sty::Options::SCF_MODES ScfMode>
+void CalculatorBase::storeDensityMatrix() {
+  auto dmat = _system->getElectronicStructure<ScfMode>()->getDensityMatrix();
+  _results->set<Scine::Utils::Property::DensityMatrix>(this->convertDensityMatrix(dmat, _system->getNElectrons<ScfMode>()));
+}
+template void CalculatorBase::storeDensityMatrix<RESTRICTED>();
+template void CalculatorBase::storeDensityMatrix<UNRESTRICTED>();
+
+void CalculatorBase::storeAOToAtomMapping() {
+  auto indices = _system->getAtomCenteredBasisController()->getBasisIndices();
+  Scine::Utils::AtomsOrbitalsIndexes counts(indices.size());
+  for (unsigned int i = 0; i < indices.size(); i++) {
+    counts.addAtom(indices[i].second - indices[i].first);
+  }
+  _results->set<Scine::Utils::Property::AOtoAtomMapping>(counts);
+}
+
+template<Sty::Options::SCF_MODES ScfMode>
+void CalculatorBase::storeAtomicCharges() {
+  auto charges = getMullikenCharges<ScfMode>();
+  _results->set<Scine::Utils::Property::AtomicCharges>(charges);
+}
+template void CalculatorBase::storeAtomicCharges<RESTRICTED>();
+template void CalculatorBase::storeAtomicCharges<UNRESTRICTED>();
+
+void CalculatorBase::storeOverlapMatrix() {
+  _results->set<Scine::Utils::Property::OverlapMatrix>(_system->getOneElectronIntegralController()->getOverlapIntegrals());
+}
+
+template<Sty::Options::SCF_MODES ScfMode>
+void CalculatorBase::storeElectronicOccupations() {
+  auto occupation = Scine::Utils::LcaoUtils::ElectronicOccupation();
+  if (ScfMode == Sty::RESTRICTED) {
+    auto nElectrons = _system->getNElectrons<Sty::RESTRICTED>();
+    occupation.fillLowestRestrictedOrbitalsWithElectrons(nElectrons);
+  }
+  else {
+    auto nElectrons = _system->getNElectrons<Sty::UNRESTRICTED>();
+    occupation.fillLowestUnrestrictedOrbitals(nElectrons.alpha, nElectrons.beta);
+  }
+  _results->set<Scine::Utils::Property::ElectronicOccupation>(occupation);
+}
+template void CalculatorBase::storeElectronicOccupations<RESTRICTED>();
+template void CalculatorBase::storeElectronicOccupations<UNRESTRICTED>();
+
+template<Sty::Options::SCF_MODES ScfMode>
+void CalculatorBase::storeElectronicEnergy() {
+  _results->set<Scine::Utils::Property::Energy>(_system->getElectronicStructure<ScfMode>()->getEnergy());
+}
+template void CalculatorBase::storeElectronicEnergy<RESTRICTED>();
+template void CalculatorBase::storeElectronicEnergy<UNRESTRICTED>();
+
+template<>
+void CalculatorBase::storeNElectrons<RESTRICTED>() {
+  auto nElectrons = _system->getNElectrons<RESTRICTED>();
+  _results->set<Scine::Utils::Property::NAlphaElectrons>(nElectrons);
+  _results->set<Scine::Utils::Property::NBetaElectrons>(nElectrons);
+}
+template<>
+void CalculatorBase::storeNElectrons<UNRESTRICTED>() {
+  auto nElectrons = _system->getNElectrons<UNRESTRICTED>();
+  _results->set<Scine::Utils::Property::NAlphaElectrons>(nElectrons.alpha);
+  _results->set<Scine::Utils::Property::NBetaElectrons>(nElectrons.beta);
+}
+
+template<Sty::Options::SCF_MODES ScfMode>
+void CalculatorBase::storeProperties() {
+  // Note: The electronic energy should be stored directly in the specific calculator, i.e., DFT/HF/CC calculators.
+  if (_requiredProperties.containsSubSet(Utils::Property::AtomicCharges)) {
+    this->storeAtomicCharges<ScfMode>();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::NAlphaElectrons) ||
+      _requiredProperties.containsSubSet(Utils::Property::NBetaElectrons)) {
+    this->storeNElectrons<ScfMode>();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::ElectronicOccupation)) {
+    this->storeElectronicOccupations<ScfMode>();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::OverlapMatrix)) {
+    this->storeOverlapMatrix();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::DensityMatrix)) {
+    this->storeDensityMatrix<ScfMode>();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::Gradients) ||
+      _requiredProperties.containsSubSet(Utils::Property::PointChargesGradients)) {
+    this->storeGradients(ScfMode);
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::OneElectronMatrix)) {
+    this->storeCoreHamiltonian();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::AOtoAtomMapping)) {
+    this->storeAOToAtomMapping();
+  }
+  if (_requiredProperties.containsSubSet(Utils::Property::OrbitalFragmentPopulations)) {
+    this->storeOrbitalFragmentPopulations<ScfMode>();
+  }
+  auto atomCollection = this->getStructure();
+  Scine::Utils::ResultsAutoCompleter completer(*atomCollection);
+  if (_requiredProperties.containsSubSet(Utils::Property::Energy)) {
+    completer.setWantedProperties(Scine::Utils::Property::Energy);
+  }
+  if (_requiredProperties.containsSubSet(Scine::Utils::Property::BondOrderMatrix)) {
+    completer.addOneWantedProperty(Scine::Utils::Property::BondOrderMatrix);
+  }
+  if (_requiredProperties.containsSubSet(Scine::Utils::Property::Hessian) or
+      _requiredProperties.containsSubSet(Scine::Utils::Property::Thermochemistry)) {
+    completer.addOneWantedProperty(Scine::Utils::Property::Thermochemistry);
+    completer.setTemperature(_settings->getDouble(Scine::Utils::SettingsNames::temperature));
+    completer.setPressure(_settings->getDouble(Scine::Utils::SettingsNames::pressure));
+  }
+  completer.generateProperties(*_results, *atomCollection);
+  _results->set<Scine::Utils::Property::SuccessfulCalculation>(true);
+}
+
+template void CalculatorBase::storeProperties<RESTRICTED>();
+template void CalculatorBase::storeProperties<UNRESTRICTED>();
+
+bool CalculatorBase::propertyRequiresSCF() {
+  std::vector<Scine::Utils::Property> scfProperties = {Scine::Utils::Property::Energy,
+                                                       Scine::Utils::Property::Gradients,
+                                                       Scine::Utils::Property::Hessian,
+                                                       Scine::Utils::Property::BondOrderMatrix,
+                                                       Scine::Utils::Property::Thermochemistry,
+                                                       Scine::Utils::Property::AtomicCharges,
+                                                       Scine::Utils::Property::DensityMatrix,
+                                                       Scine::Utils::Property::ElectronicOccupation,
+                                                       Scine::Utils::Property::PointChargesGradients};
+  for (const auto& prop : scfProperties) {
+    if (this->_requiredProperties.containsSubSet({prop})) {
+      return true;
+    }
+  }
+  return false;
+}
+std::shared_ptr<Sty::SystemController> CalculatorBase::getSystemController() {
+  if (!_system) {
+    // Parse current settings
+    auto settings = Settings();
+    // throws error for wrong input and updates 'any' entries
+    Utils::Solvation::ImplicitSolvation::solvationNeededAndPossible(availableSolvationModels(), *_settings);
+    // Apply user settings
+    _settings->applyTo(settings);
+    // Apply fixed settings and those that are specific to the Calculator implementation at hand.
+    this->applyFixedSettings(settings);
+    // Generate a unique name
+    Scine::Utils::UniqueIdentifier uid;
+    settings.name = uid.getStringRepresentation();
+    // Generate the system
+    _system = std::make_shared<SystemController>(_geometry, settings);
+  }
+  return _system;
+}
+template<>
+Utils::SpinAdaptedMatrix
+CalculatorBase::orbitalPopulationsToFragmentPopulations(const SPMatrix<Sty::RESTRICTED>& orbitalPopulations) {
+  const unsigned int nAtoms = orbitalPopulations.rows();
+  Eigen::VectorXd ghostAtomZeros = Eigen::VectorXd::Zero(nAtoms);
+  const auto& atoms = this->getSystemController()->getGeometry()->getAtoms();
+  for (unsigned int iAtom = 0; iAtom < nAtoms; ++iAtom) {
+    const auto& atom = atoms[iAtom];
+    if (atom->isDummy()) {
+      continue;
+    }
+    ghostAtomZeros(iAtom) = 1.0;
+  }
+  // Eliminate the populations in the matrix on ghost atoms by multiplying with the ghostAtomZeros vector.
+  // Then, we only have to take the column-wise sum to get the populations.
+  Eigen::VectorXd orbitalFragmentPopulations =
+      Eigen::VectorXd((orbitalPopulations.array().colwise() * ghostAtomZeros.array()).colwise().sum().transpose());
+  return Utils::SpinAdaptedMatrix::createRestricted(orbitalFragmentPopulations.transpose());
+}
+
+template<>
+Utils::SpinAdaptedMatrix
+CalculatorBase::orbitalPopulationsToFragmentPopulations(const SPMatrix<Sty::UNRESTRICTED>& orbitalPopulations) {
+  const auto alpha = this->orbitalPopulationsToFragmentPopulations<RESTRICTED>(orbitalPopulations.alpha);
+  const auto beta = this->orbitalPopulationsToFragmentPopulations<RESTRICTED>(orbitalPopulations.beta);
+  return Utils::SpinAdaptedMatrix::createUnrestricted(alpha.restrictedMatrix(), beta.restrictedMatrix());
+}
+
+template<Sty::Options::SCF_MODES ScfMode>
+void CalculatorBase::storeOrbitalFragmentPopulations() {
+  auto systemController = this->getSystemController();
+  auto orbitalWisePopulations = MullikenPopulationCalculator<ScfMode>::calculateAtomwiseOrbitalPopulations(
+      systemController->getActiveOrbitalController<ScfMode>()->getCoefficients(),
+      systemController->getOneElectronIntegralController()->getOverlapIntegrals(),
+      systemController->getAtomCenteredBasisController()->getBasisIndices());
+
+  auto matrix = orbitalPopulationsToFragmentPopulations<ScfMode>(orbitalWisePopulations);
+  _results->set<Scine::Utils::Property::OrbitalFragmentPopulations>(matrix);
+}
+template void CalculatorBase::storeOrbitalFragmentPopulations<RESTRICTED>();
+template void CalculatorBase::storeOrbitalFragmentPopulations<UNRESTRICTED>();
 } /* namespace Serenity */
 } /* namespace Scine */

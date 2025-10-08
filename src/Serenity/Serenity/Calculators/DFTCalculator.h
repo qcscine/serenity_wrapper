@@ -71,6 +71,9 @@ class DFTCalculator : public Scine::Utils::CloneInterface<DFTCalculator, Calcula
   inline std::vector<std::string> availableSolvationModels() const final {
     return {"cpcm", "iefpcm"};
   }
+
+ private:
+  void storeGradients(Sty::Options::SCF_MODES ScfMode) override;
 };
 
 } /* namespace Serenity */

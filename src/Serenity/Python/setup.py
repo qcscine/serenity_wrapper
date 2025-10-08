@@ -38,7 +38,7 @@ setuptools.setup(
     url="https://www.scine.ethz.ch",
     packages=["scine_serenity_wrapper"],
     include_package_data=True,
-    package_data={"scine_serenity_wrapper": ['*.txt' @serenity_PY_DEPS@, "Tests/*"]},
+    package_data={"scine_serenity_wrapper": ['*.txt' @serenity_PY_DEPS@, "Tests/*", "Tests/resources/*"]},
     install_requires=["scine_utilities"],
     classifiers=[
         "Programming Language :: Python",

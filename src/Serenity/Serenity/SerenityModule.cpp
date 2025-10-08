@@ -9,6 +9,7 @@
 #include "Serenity/Calculators/CCCalculator.h"
 #include "Serenity/Calculators/DFTCalculator.h"
 #include "Serenity/Calculators/HFCalculator.h"
+#include "Serenity/Calculators/SerenityEmbeddingCalculator.h"
 /* External Includes */
 #include <Core/DerivedModule.h>
 #include <Core/Exceptions.h>
@@ -23,7 +24,8 @@ std::string SerenityModule::name() const noexcept {
 }
 
 using InterfaceModelMap =
-    boost::mpl::map<boost::mpl::pair<Scine::Core::Calculator, boost::mpl::vector<DFTCalculator, HFCalculator, CCCalculator>>>;
+    boost::mpl::map<boost::mpl::pair<Scine::Core::Calculator, boost::mpl::vector<DFTCalculator, HFCalculator, CCCalculator, SerenityEmbeddingCalculator>>,
+                    boost::mpl::pair<Core::EmbeddingCalculator, boost::mpl::vector<SerenityEmbeddingCalculator>>>;
 
 boost::any SerenityModule::get(const std::string& interface, const std::string& model) const {
   boost::any resolved = Scine::Core::DerivedModule::resolve<InterfaceModelMap>(interface, model);

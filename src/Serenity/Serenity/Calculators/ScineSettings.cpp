@@ -9,6 +9,7 @@
 /* Serenity Includes */
 #include <settings/Settings.h>
 /* Scine Includes */
+#include <Utils/ExternalQC/SettingsNames.h>
 #include <Utils/UniversalSettings/SettingsNames.h>
 #include <algorithm>
 
@@ -43,7 +44,7 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
 
   IntDescriptor molecular_charge("The molecular charge.");
   molecular_charge.setDefaultValue(defaults.charge);
-  this->_fields.push_back("molecular_charge", molecular_charge);
+  this->_fields.push_back(Utils::SettingsNames::molecularCharge, molecular_charge);
 
   IntDescriptor scf_max_iterations("The maximum number of SCF iterations.");
   scf_max_iterations.setDefaultValue(defaults.scf.maxCycles);
@@ -110,6 +111,12 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   basis_integralThreshold.setDefaultValue(defaults.basis.integralThreshold);
   this->_fields.push_back("basis_integralThreshold", basis_integralThreshold);
 
+  // Serenity's default (1e-8, 06.02.2024) is a bit greedy and may lead an unstable SCF in some cases.
+  DoubleDescriptor basis_integralIncrementThresholdStart(
+      "The starting threshold for prescreening in integral evaluations.");
+  basis_integralIncrementThresholdStart.setDefaultValue(1e-10);
+  this->_fields.push_back("basis_integralIncrementThresholdStart", basis_integralIncrementThresholdStart);
+
   StringDescriptor basis_basisLibPath("The path to the basis set files.");
   basis_basisLibPath.setDefaultValue(defaults.basis.basisLibPath);
   this->_fields.push_back("basis_basisLibPath", basis_basisLibPath);
@@ -160,6 +167,27 @@ ScineSettings::ScineSettings() : Settings("SerenityDFTSettings") {
   pcm_radiiType.setDefaultValue("uff");
   this->_fields.push_back("pcm_radiiType", pcm_radiiType);
 
+  // - External charges
+  StringDescriptor externalChargeFile("File name for external charges. By default, no file given.");
+  externalChargeFile.setDefaultValue("");
+  this->_fields.push_back(Utils::ExternalQC::SettingsNames::pointChargesFile, externalChargeFile);
+
+  // Local correlation
+  Utils::UniversalSettings::StringDescriptor pnoSettings("The PNO settings flag (LOOSE, NORMAL, TIGHT).");
+  pnoSettings.setDefaultValue("NORMAL");
+  this->_fields.push_back("pno_settings", pnoSettings);
+
+  Utils::UniversalSettings::BoolDescriptor frozenCore("If true, core orbitals are not correlated. By default, true.");
+  frozenCore.setDefaultValue(true);
+  this->_fields.push_back("use_frozen_core", frozenCore);
+
+  Utils::UniversalSettings::BoolDescriptor ignoreCharge(
+      "If true, the charge/spin-multiplicity check in Serenity is skipped."
+      " This is useful if top-down QM/QM embedding calculations are performed and only the"
+      " sum of charges are meaningful but not the charge of the subsystems. By default, false.");
+  ignoreCharge.setDefaultValue(false);
+  this->_fields.push_back("ignore_charge", ignoreCharge);
+
   this->resetToDefaults();
 }
 
@@ -173,6 +201,7 @@ void ScineSettings::applyTo(Sty::Settings& settings) {
   // Mandatory
   // TODO
   settings.path = settings.path + "serenity_tmp/";
+  settings.ignoreCharge = this->getBool("ignore_charge");
 
   // Serenity
   // - Basis - Block
@@ -184,6 +213,7 @@ void ScineSettings::applyTo(Sty::Settings& settings) {
   settings.basis.integralThreshold = this->getDouble("basis_integralThreshold");
   settings.basis.basisLibPath = this->getString("basis_basisLibPath");
   settings.basis.firstECP = this->getInt("basis_firstECP");
+  settings.basis.integralIncrementThresholdStart = this->getDouble("basis_integralIncrementThresholdStart");
   // - Grid - Block
   value = this->getString("grid_gridType");
   Sty::Options::resolve(value, settings.grid.gridType);
@@ -213,6 +243,8 @@ void ScineSettings::applyTo(Sty::Settings& settings) {
   }
   settings.pcm.alpha = this->getInt("pcm_alpha");
   settings.pcm.scaling = this->getBool("pcm_scaling");
+
+  settings.extCharges.externalChargesFile = this->getString(Utils::ExternalQC::SettingsNames::pointChargesFile);
 
   // Generalized duplicates
   settings.spin = (this->getInt(SettingsNames::spinMultiplicity) - 1);

@@ -40,31 +40,48 @@ Scine::Utils::PropertyList HFCalculator::possibleProperties() const {
          Scine::Utils::Property::BondOrderMatrix | Scine::Utils::Property::Thermochemistry |
          Scine::Utils::Property::AtomicCharges | Scine::Utils::Property::AOtoAtomMapping |
          Scine::Utils::Property::DensityMatrix | Scine::Utils::Property::OverlapMatrix |
-         Scine::Utils::Property::ElectronicOccupation;
+         Scine::Utils::Property::ElectronicOccupation | Scine::Utils::Property::OneElectronMatrix |
+         Scine::Utils::Property::PointChargesGradients | Scine::Utils::Property::OrbitalFragmentPopulations |
+         Scine::Utils::Property::NAlphaElectrons | Scine::Utils::Property::NBetaElectrons;
 }
 
 void HFCalculator::applyFixedSettings(Sty::Settings& settings) const {
   settings.method = Sty::Options::ELECTRONIC_STRUCTURE_THEORIES::HF;
 }
 
+void HFCalculator::storeGradients(Sty::Options::SCF_MODES ScfMode) {
+  Eigen::MatrixXd gradients;
+  std::shared_ptr<Eigen::MatrixXd> pointChargeGradients = nullptr;
+  if (ScfMode == Sty::Options::SCF_MODES::RESTRICTED) {
+    auto potBundle = _system->getElectronicStructure<Sty::Options::SCF_MODES::RESTRICTED>()->getPotentialBundle();
+    gradients = potBundle->getGradients().eval();
+    if (_system->hasExternalCharges()) {
+      pointChargeGradients = std::make_shared<Eigen::MatrixXd>(potBundle->getPointChargeGradients());
+    }
+  }
+  else {
+    auto potBundle = _system->getElectronicStructure<Sty::Options::SCF_MODES::UNRESTRICTED>()->getPotentialBundle();
+    gradients = potBundle->getGradients().eval();
+    if (_system->hasExternalCharges()) {
+      pointChargeGradients = std::make_shared<Eigen::MatrixXd>(potBundle->getPointChargeGradients());
+    }
+  }
+  _system->getGeometry()->setGradients(gradients);
+  _results->set<Scine::Utils::Property::Gradients>(gradients);
+  if (pointChargeGradients != nullptr) {
+    _system->setPointChargeGradients(*pointChargeGradients);
+    _results->set<Scine::Utils::Property::PointChargesGradients>(*pointChargeGradients);
+  }
+}
+
 template<Sty::Options::SCF_MODES ScfMode>
 void HFCalculator::calculateImpl() {
   // Calculate energy and electronic structure
-  if (this->_moved) {
+  if (this->_moved && this->propertyRequiresSCF()) {
     Sty::ScfTask<ScfMode> scf(_system);
     scf.run();
     this->_moved = false;
-  }
-  auto es = _system->getElectronicStructure<ScfMode>();
-  _results->set<Scine::Utils::Property::Energy>(es->getEnergy());
-
-  // Calculate gradients
-  if (_requiredProperties.containsSubSet(Scine::Utils::Property::Gradients)) {
-    Eigen::MatrixXd gradients;
-    auto potBundle = _system->getElectronicStructure<ScfMode>()->getPotentialBundle();
-    gradients = potBundle->getGradients().eval();
-    _system->getGeometry()->setGradients(gradients);
-    _results->set<Scine::Utils::Property::Gradients>(gradients);
+    this->storeElectronicEnergy<ScfMode>();
   }
 
   // Calculate Hessian
@@ -86,54 +103,7 @@ void HFCalculator::calculateImpl() {
     // reset output
     std::cout.rdbuf(coutbuf);
   }
-  _results->set<Scine::Utils::Property::SuccessfulCalculation>(true);
-
-  if (_requiredProperties.containsSubSet(Scine::Utils::Property::AtomicCharges)) {
-    auto charges = getMullikenCharges<ScfMode>();
-    _results->set<Scine::Utils::Property::AtomicCharges>(charges);
-  }
-
-  /*
-   * Autocompletion part of the results
-   */
-  auto atomCollection = this->getStructure();
-  Scine::Utils::ResultsAutoCompleter completer(*atomCollection);
-  // Fill results with some basic data
-  //  - AO to Atom Mapping
-  auto indices = _system->getAtomCenteredBasisController()->getBasisIndices();
-  Scine::Utils::AtomsOrbitalsIndexes counts(indices.size());
-  for (unsigned int i = 0; i < indices.size(); i++) {
-    counts.addAtom(indices[i].second - indices[i].first);
-  }
-  _results->set<Scine::Utils::Property::AOtoAtomMapping>(counts);
-  //  - AO Overlap
-  _results->set<Scine::Utils::Property::OverlapMatrix>(_system->getOneElectronIntegralController()->getOverlapIntegrals());
-  //  - AO Density Matrix
-  auto dmat = es->getDensityMatrix();
-  _results->set<Scine::Utils::Property::DensityMatrix>(this->convertDensityMatrix(dmat, _system->getNElectrons<ScfMode>()));
-  //  - Occupations
-  auto occupation = Scine::Utils::LcaoUtils::ElectronicOccupation();
-  if (ScfMode == Sty::RESTRICTED) {
-    auto nElectrons = _system->getNElectrons<Sty::RESTRICTED>();
-    occupation.fillLowestRestrictedOrbitalsWithElectrons(nElectrons);
-  }
-  else {
-    auto nElectrons = _system->getNElectrons<Sty::UNRESTRICTED>();
-    occupation.fillLowestUnrestrictedOrbitals(nElectrons.alpha, nElectrons.beta);
-  }
-  _results->set<Scine::Utils::Property::ElectronicOccupation>(occupation);
-  // Autocomplete bond orders
-  completer.setWantedProperties(Scine::Utils::Property::Energy);
-  if (_requiredProperties.containsSubSet(Scine::Utils::Property::BondOrderMatrix)) {
-    completer.addOneWantedProperty(Scine::Utils::Property::BondOrderMatrix);
-  }
-  if (_requiredProperties.containsSubSet(Scine::Utils::Property::Hessian) or
-      _requiredProperties.containsSubSet(Scine::Utils::Property::Thermochemistry)) {
-    completer.addOneWantedProperty(Scine::Utils::Property::Thermochemistry);
-    completer.setTemperature(_settings->getDouble(Scine::Utils::SettingsNames::temperature));
-    completer.setPressure(_settings->getDouble(Scine::Utils::SettingsNames::pressure));
-  }
-  completer.generateProperties(*_results, *atomCollection);
+  this->storeProperties<ScfMode>();
 }
 
 bool HFCalculator::supportsMethodFamily(const std::string& methodFamily) const {

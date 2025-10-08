@@ -34,6 +34,7 @@ class CCCalculator : public Scine::Utils::CloneInterface<CCCalculator, Calculato
  public:
   static constexpr const char* model = "CC";
   static constexpr const char* program = "Serenity";
+  static constexpr const char* calculatorName = "SerenityCCCalculator";
   /// @brief Default Constructor
   CCCalculator() = default;
   /// @brief Default Destructor.
@@ -69,8 +70,11 @@ class CCCalculator : public Scine::Utils::CloneInterface<CCCalculator, Calculato
     this->calculateImpl<Sty::UNRESTRICTED>();
   }
   inline std::vector<std::string> availableSolvationModels() const final {
-    return {};
+    return {"cpcm", "iefpcm"};
   }
+
+ private:
+  void storeGradients(Sty::Options::SCF_MODES ScfMode) override;
 };
 
 } /* namespace Serenity */

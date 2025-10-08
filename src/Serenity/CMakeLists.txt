@@ -1,11 +1,14 @@
 # Load lists of source files
 include(Files.cmake)
 
-# Find/Import dependecies
+# Find/Import dependencies
 include(ImportUtilsOS)
 import_utils_os()
 include(ImportCore)
 import_core()
+include(ImportGTest)
+import_gtest()
+
 
 add_library(Serenity SHARED ${SERENITY_MODULE_FILES})
 set_target_properties(Serenity PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -50,6 +53,40 @@ install(
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )
+
+# Tests
+if(SCINE_BUILD_TESTS)
+  find_package(HDF5 REQUIRED COMPONENTS HL CXX)
+  message("HDF5 Libs ${HDF5_LIBRARIES}")
+
+  add_executable(SerenityWrapper_tests ${SERENITY_TEST_FILES})
+  target_link_libraries(SerenityWrapper_tests
+        PRIVATE
+          GTest::Main
+          GMock::GMock
+          Serenity
+          Scine::UtilsOS
+          serenity
+          ${CMAKE_DL_LIBS}
+          ${HDF5_LIBRARIES}
+          Scine::CoreHeaders
+          Scine::Core
+  )
+  add_test(
+          NAME SerenityWrapperTests
+          COMMAND SerenityWrapper_tests --gtest_output=xml:gtest_report.xml
+          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  set_tests_properties(SerenityWrapperTests PROPERTIES
+          ENVIRONMENT SCINE_MODULE_PATH=${CMAKE_CURRENT_BINARY_DIR}
+  )
+  # Copy files needed for tests
+  file(
+          COPY ${CMAKE_CURRENT_SOURCE_DIR}/Tests/Resources
+          DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+  )
+
+endif ()
 
 # Python Bindings
 if(SCINE_BUILD_PYTHON_BINDINGS)
@@ -97,6 +134,10 @@ if(SCINE_BUILD_PYTHON_BINDINGS)
   add_custom_command(TARGET Serenity POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${_serenity_data_dir}/basis ${CMAKE_CURRENT_BINARY_DIR}/scine_serenity_wrapper/data/basis
     COMMENT "Copying Serenity basis files to 'scine_serenity_wrapper'"
+  )
+  add_custom_command(TARGET Serenity POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests ${CMAKE_CURRENT_BINARY_DIR}/scine_serenity_wrapper/Tests
+          COMMENT "Copying Tests to 'scine_serenity_wrapper'"
   )
   unset(_serenity_data_dir)
 

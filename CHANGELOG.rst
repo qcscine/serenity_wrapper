@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Release 4.0.0
+-------------
+
+- Add support for QM/MM embedding and QM/QM/MM embedding
+
 Release 3.1.0
 -------------
 
